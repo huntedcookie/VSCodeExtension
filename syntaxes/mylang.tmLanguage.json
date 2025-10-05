@@ -1,0 +1,47 @@
+{
+  "scopeName": "source.mylang",
+  "patterns": [
+    {
+      "name": "keyword.control.mylang",
+      "match": "\\b(if|else|ifelse|while|clamp|abs|ceil|floor)\\b"
+    },
+    {
+      "name": "keyword.const.mylang",
+      "match": "\\b(const)\\b"
+    },
+    {
+      "name": "keyword.input.mylang",
+      "match": "\\b(in)\\b"
+    },
+    {
+      "name": "keyword.output.mylang",
+      "match": "\\b(out)\\b"
+    },
+    {
+      "name": "entity.name.function.mylang",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*(?=\\()"
+    },
+    {
+      "name": "variable.other.mylang",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+    },
+    {
+      "name": "comment.line.double-slash.mylang",
+      "match": "//.*$"
+    },
+    {
+      "name": "comment.block.mylang",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    {
+      "name": "string.quoted.double.mylang",
+      "match": "\".*?\""
+    },
+    {
+      "name": "constant.numeric.mylang",
+      "match": "\\b[0-9]+\\b"
+    }
+  ],
+  "repository": {}
+}

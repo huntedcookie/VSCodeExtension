@@ -1,0 +1,24 @@
+in int x;
+out int allowed;
+out int not_allowed;
+
+main() {
+    const float var_float;
+    float depr = 0.0;
+    int var_int = va;
+    allowed = var_float;
+    float var_float_2 = 1;
+    var_float_2 = var_float;
+    bool var_bool;
+    if (var_bool) 
+    {abberbb
+
+    }
+    int ttttttt = 1;
+}
+var_float = var_float_2;
+//schöner Test
+
+/* multi line 
+second line
+comment */

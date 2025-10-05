@@ -1,0 +1,59 @@
+{
+  "name": "my-custom-lang",
+  "displayName": "My Custom Language",
+  "description": "Un lenguaje inventado de ejemplo",
+  "version": "0.0.2",
+  "publisher": "tupublisher",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "activationEvents": [
+    "onLanguage:mylang"
+  ],
+  "main": "./out/client/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "mylang",
+        "aliases": [
+          "MyLang",
+          "mylang"
+        ],
+        "extensions": [
+          ".mylang"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mylang",
+        "scopeName": "source.mylang",
+        "path": "./syntaxes/mylang.tmLanguage.json"
+      }
+    ],
+    "semanticTokenColors": {
+      "variable": "#ffffff",
+      "variable.readonly": "#00ffff",
+      "variable.input": "#00ffff",
+      "variable.output": "#ff8800",
+      "variable.deprecated": "#888888",
+      "function": "#80ff80",
+      "keyword": "#ff4080"
+    }
+  },
+  "scripts": {
+    "compile": "tsc -b client server",
+    "watch": "tsc -b client server -w"
+  },
+  "devDependencies": {
+    "typescript": "5.3.3",
+    "@types/node": "18.0.0",
+    "@types/vscode": "1.82.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "8.1.0",
+    "vscode-languageserver": "8.1.0",
+    "vscode-languageserver-textdocument": "1.0.8"
+  }
+}
