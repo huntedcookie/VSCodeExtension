@@ -74,10 +74,72 @@ async function validateTextDocument(document) {
     const text = document.getText();
     const diagnostics = [];
     const lines = text.split(/\r?\n/);
-    lines.forEach((line, i) => {
+    let inBlockComment = false;
+    for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        const originalLine = line;
+        // --- Manejo de comentarios multilínea / inline ---
+        if (inBlockComment) {
+            const endIdx = line.indexOf("*/");
+            if (endIdx >= 0) {
+                // cierra el comentario en esta línea -> queda lo que hay después
+                line = line.slice(endIdx + 2);
+                inBlockComment = false;
+            }
+            else {
+                // seguimos dentro del bloque de comentario -> ignorar la línea entera
+                continue;
+            }
+        }
+        // eliminar cualquier comentario /* ... */ que esté en la misma línea (posible multiple)
+        while (true) {
+            const startIdx = line.indexOf("/*");
+            if (startIdx === -1)
+                break;
+            const endIdx = line.indexOf("*/", startIdx + 2);
+            if (endIdx === -1) {
+                // inicia un bloque y no cierra en esta línea -> cortar y activar flag
+                line = line.slice(0, startIdx);
+                inBlockComment = true;
+                break;
+            }
+            else {
+                // bloque completo dentro de la misma línea -> eliminar
+                line = line.slice(0, startIdx) + line.slice(endIdx + 2);
+            }
+        }
+        // quitar comentarios de línea //
+        const slIdx = line.indexOf("//");
+        if (slIdx >= 0)
+            line = line.slice(0, slIdx);
         const trimmed = line.trim();
-        if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.endsWith("*/"))
-            return;
+        if (trimmed === "")
+            continue; // línea vacía (o sólo comentario)
+        // --- Reglas que NO requieren ';' ---
+        // 1) líneas que sólo abren/cerran bloque (comienzan con { o })
+        if (trimmed.startsWith("{") || trimmed.startsWith("}"))
+            continue;
+        // 2) sentencias de control: if, else, while, for, switch (no necesitan ;)
+        if (/^(if|else|while|for|switch)\b/.test(trimmed))
+            continue;
+        // 3) declaración / cabecera de función: nombre(...)  (ej: main() { o main() )
+        //    permitimos que tenga o no '{' al final
+        if (/^[A-Za-z_]\w*\s*\([^)]*\)\s*\{?$/.test(trimmed)) {
+            continue;
+        }
+        // A estas alturas, la mayoría de las líneas deben terminar en ';'
+        if (!trimmed.endsWith(";")) {
+            diagnostics.push({
+                severity: node_1.DiagnosticSeverity.Error,
+                range: {
+                    start: { line: i, character: 0 },
+                    end: { line: i, character: originalLine.length }
+                },
+                message: "Falta ';' al final de la instrucción (o línea no reconocida).",
+                source: "mylang"
+            });
+            continue;
+        }
         const declareAssign = line.match(/(\w+)\s+(\w+)\s*=\s*(.+);/);
         const plainAssign = line.match(/(\w+)\s*=\s*(.+);/);
         if (declareAssign) {
@@ -134,20 +196,7 @@ async function validateTextDocument(document) {
                 });
             }
         }
-        if (trimmed === "" || trimmed.endsWith("{") || trimmed.endsWith("}"))
-            return;
-        if (!trimmed.endsWith(";")) {
-            diagnostics.push({
-                severity: node_1.DiagnosticSeverity.Error,
-                range: {
-                    start: { line: i, character: 0 },
-                    end: { line: i, character: line.length }
-                },
-                message: "Falta ';' al final de la instrucción",
-                source: "mylang"
-            });
-        }
-    });
+    }
     connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 connection.languages.semanticTokens.on((params) => {
@@ -254,7 +303,7 @@ connection.onCompletion((params) => {
     const text = doc.getText();
     const lines = text.split(/\r?\n/);
     const posLine = lines[params.position.line] || "";
-    const assignMatch = posLine.match(/^(?:int|float|bool|float2|float3|float4)?\s*(\w+)\s*=/);
+    const assignMatch = posLine.match(/(?:int|float|bool|float2|float3|float4)?\s*(\w+)\s*=/);
     if (assignMatch) {
         const varName = assignMatch[1];
         const lhsVar = vars.find(v => v.name === varName);
