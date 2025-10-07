@@ -32,15 +32,23 @@
         "path": "./syntaxes/mylang.tmLanguage.json"
       }
     ],
-    "semanticTokenColors": {
-      "variable": "#ffffff",
-      "variable.readonly": "#00ffff",
-      "variable.input": "#00ffff",
-      "variable.output": "#ff8800",
-      "variable.deprecated": "#888888",
-      "function": "#80ff80",
-      "keyword": "#ff4080"
-    }
+    "semanticTokenTypes": [
+      {
+        "id": "directiveInclude",
+        "superType": "keyword",
+        "description": "Include directive, same color as #include"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "mylang",
+        "scopes": {
+          "directiveInclude": [
+            "keyword.control.directive.include"
+          ]
+        }
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -b client server",

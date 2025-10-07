@@ -13,8 +13,8 @@ var TypeName;
     TypeName[TypeName["float3"] = 4] = "float3";
     TypeName[TypeName["float4"] = 5] = "float4";
 })(TypeName || (TypeName = {}));
-const tokenTypes = ["variable", "function", "keyword"];
-const tokenModifiers = ["readonly", "input", "output", "deprecated", "singleUse"];
+const tokenTypes = ["variable", "function", "keyword", "directiveInclude"];
+const tokenModifiers = ["readonly", "input", "control", "deprecated", "singleUse"];
 const legend = { tokenTypes, tokenModifiers };
 const variableKinds = {};
 connection.onInitialize((_params) => {
@@ -242,6 +242,7 @@ connection.languages.semanticTokens.on((params) => {
         }
     }
     connection.console.log("useCount: " + JSON.stringify(useCount));
+    const diagnostics = [];
     // 4) recorrer de nuevo y empujar tokens con modificadores
     for (let li = 0; li < lines.length; li++) {
         const line = lines[li];
@@ -251,7 +252,7 @@ connection.languages.semanticTokens.on((params) => {
             while ((m = regex.exec(line)) !== null) {
                 const startChar = m.index;
                 const length = v.name.length;
-                const typeIndex = tokenTypes.indexOf("variable"); // siempre variable para nombres
+                var typeIndex = tokenTypes.indexOf("variable"); // siempre variable para nombres
                 // calcular máscara de modificadores
                 let modMask = 0;
                 // readonly (const / in)
@@ -260,19 +261,30 @@ connection.languages.semanticTokens.on((params) => {
                     modMask |= (1 << idxReadonly);
                 }
                 // output
-                const idxOutput = tokenModifiers.indexOf("output");
+                const idxOutput = tokenModifiers.indexOf("control");
                 if (idxOutput >= 0 && outputVars.has(v.name)) {
-                    modMask |= (1 << idxOutput);
+                    typeIndex = tokenTypes.indexOf("directiveInclude");
+                    // modMask |= (1 << idxOutput);
                 }
                 // deprecated = usado solo una vez
                 const idxDeprecated = tokenModifiers.indexOf("deprecated");
                 if (idxDeprecated >= 0 && (useCount[v.name] || 0) === 1) {
                     modMask |= (1 << idxDeprecated);
+                    diagnostics.push({
+                        severity: node_1.DiagnosticSeverity.Warning,
+                        range: {
+                            start: { line: li, character: startChar },
+                            end: { line: li, character: startChar + length }
+                        },
+                        message: `La variable "${v.name}" está marcada como deprecated (solo se usa una vez).`,
+                        source: "mylang"
+                    });
                 }
                 builder.push(li, startChar, length, typeIndex, modMask);
             }
         }
     }
+    connection.sendDiagnostics({ uri: params.textDocument.uri, diagnostics });
     connection.console.log("semanticTokens: built tokens for " + params.textDocument.uri);
     return builder.build();
 });
