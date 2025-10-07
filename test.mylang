@@ -2,24 +2,55 @@ in int x;
 out int allowed;
 out int not_allowed;
 
-main() {
+main {
     const float var_float;
     float depr = 0.0;
     int var_int = var_float;
     allowed = var_float;
-    float var_float_2 = 1;
-    var_int = var_float;
-    float test = var_float;
-    bool var_bool;
-    if (var_bool) 
-    {abberbb
+    float var_float_2 = 1;    //test
+    var_int = var_float       //test2
+    float test = var_float;   //teest3
+    bool var_bool
+    if (var_bool + = 1)
+    {
 
+        float abberbb =
+                              //test
     }
     int ttttttt = 1;
-}
-var_float = var_float_2;
-//schöner Test
 
-/* multi line 
-second line
-comment */
+    var_float = var_float_2;
+}
+                              //schöner Test
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

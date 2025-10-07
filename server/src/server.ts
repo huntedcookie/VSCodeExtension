@@ -106,7 +106,7 @@ connection.onHover((params): Hover | null => {
     const line = lines[params.position.line];
     if (!line) return null;
 
-    // Buscar palabra bajo el cursor
+    // Detectar palabra bajo el cursor
     const regex = /\b[A-Za-z_]\w*\b/g;
     let match: RegExpExecArray | null;
     let hoveredWord: string | null = null;
@@ -122,40 +122,141 @@ connection.onHover((params): Hover | null => {
 
     if (!hoveredWord) return null;
 
-    // Buscar info de variable
+    // Buscar si es una variable conocida
     const vars = variableKinds[params.textDocument.uri] || [];
     const v = vars.find(v => v.name === hoveredWord);
     if (!v) return null;
 
-    // Devolver información tipo tooltip
+    // Contar cuántas veces aparece en todo el documento
+    const usageRegex = new RegExp(`\\b${hoveredWord}\\b`, "g");
+    const matches = [...text.matchAll(usageRegex)];
+    const usageCount = matches.length;
+
+    // Crear contenido enriquecido en Markdown
+    const typeLabel = TypeName[v.type];
+    const usageLabel =
+        usageCount === 1
+            ? "🔸 Se usa **una sola vez**"
+            : `🟢 Se usa **${usageCount}** veces`;
+
+    const isDeprecated = usageCount === 1 ? "\n\n _Marcado como **deprecated** (solo se usa una vez)_" : "";
+
     return {
         contents: {
             kind: MarkupKind.Markdown,
-            value: `**${v.name}**: \`${TypeName[v.type]}\``
+            value: `**${v.name}**\n\nTipo: \`${typeLabel}\`\n\n${usageLabel}${isDeprecated}`
         }
     };
 });
 
 function formatMyLang(text: string): string {
     const lines = text.split(/\r?\n/);
-    const formatted = lines
-        .map(line => {
-            // eliminar espacios extra
-            let trimmed = line.trim();
 
-            // agregar indentación según llaves
-            if (trimmed.startsWith("}")) {
-                trimmed = "    " + trimmed; // 4 espacios
-            } else if (trimmed.endsWith("{")) {
-                trimmed = "    " + trimmed;
-            }
+    interface LineParts {
+        code: string;
+        comment: string;
+        raw: string;
+    }
 
-            return trimmed;
-        })
-        .join("\n");
+    const parsed: LineParts[] = [];
+    let inBlockComment = false;
 
-    return formatted + "\n";
+    // 1️⃣ Separar código y comentarios
+    for (let raw of lines) {
+        let line = raw;
+        let code = "";
+        let comment = "";
+
+        // Mantener comentarios multilínea tal cual
+        if (inBlockComment) {
+            parsed.push({ code: "", comment: line.trimEnd(), raw });
+            if (line.includes("*/")) inBlockComment = false;
+            continue;
+        }
+        if (line.trim().startsWith("/*")) {
+            inBlockComment = !line.includes("*/");
+            parsed.push({ code: "", comment: line.trimEnd(), raw });
+            continue;
+        }
+
+        const commentIdx = line.indexOf("//");
+        if (commentIdx >= 0) {
+            code = line.slice(0, commentIdx).trimEnd();
+            comment = line.slice(commentIdx).trim();
+        } else {
+            code = line.trimEnd();
+        }
+
+        parsed.push({ code: code.trimStart(), comment, raw });
+    }
+
+    // 2️⃣ Normalizar código (espacios, llaves, operadores)
+    const cleaned: { code: string; comment: string }[] = parsed.map(({ code, comment }) => {
+        if (!code) return { code, comment };
+
+        // Normalizar estructuras de control
+        code = code
+            .replace(/\b(if|else if|while|for)\s*\(([^)]*)\)\s*\{?/g, "$1 ($2)")
+            .replace(/\belse\s*(?=\{|\b)/g, "else {");
+
+        // Si tiene doble '{{', reducir a una
+        code = code.replace(/\{\s*\{/g, "{");
+
+        // Espaciado alrededor de operadores comunes
+        code = code
+            .replace(/\s*([=+\-*/<>!&|])\s*/g, " $1 ")
+            .replace(/\s{2,}/g, " "); // eliminar espacios dobles
+
+        // Limpiar espacios antes de ;
+        code = code.replace(/\s*;\s*/g, "; ");
+
+        return { code: code.trim(), comment };
+    });
+
+    // 3️⃣ Indentar correctamente según llaves
+    let indentLevel = 0;
+    const indented: string[] = [];
+    for (const { code, comment } of cleaned) {
+        if (code === "" && comment === "") {
+            indented.push("");
+            continue;
+        }
+
+        // Si la línea empieza con '}', reducir indentación antes
+        if (/^\}/.test(code)) indentLevel = Math.max(0, indentLevel - 1);
+
+        const indent = "    ".repeat(indentLevel);
+        let formatted = indent + code;
+
+        // Añadir comentario
+        if (comment) formatted += " " + comment;
+
+        indented.push(formatted);
+
+        // Si la línea termina con '{', aumentar indentación
+        if (/\{$/.test(code)) indentLevel++;
+    }
+
+    // 4️⃣ Alinear comentarios en columna
+    let maxCodeLength = 0;
+    for (const line of indented) {
+        const idx = line.indexOf("//");
+        if (idx > 0) maxCodeLength = Math.max(maxCodeLength, idx);
+    }
+
+    const aligned = indented.map(line => {
+        const idx = line.indexOf("//");
+        if (idx < 0) return line;
+        const code = line.slice(0, idx).trimEnd();
+        const comment = line.slice(idx).trim();
+        const padding = " ".repeat(maxCodeLength - code.length + 2);
+        return code + padding + comment;
+    });
+
+    return aligned.join("\n") + "\n";
 }
+
+
 
 
 connection.onDocumentFormatting(async (params, cancelToken) => {
