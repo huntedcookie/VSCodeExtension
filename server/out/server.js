@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const node_1 = require("vscode-languageserver/node");
 const vscode_languageserver_textdocument_1 = require("vscode-languageserver-textdocument");
 const node_2 = require("vscode-languageserver/node");
+const node_3 = require("vscode-languageserver/node");
+const node_4 = require("vscode-languageserver/node");
 const connection = (0, node_1.createConnection)(node_1.ProposedFeatures.all);
 const documents = new node_1.TextDocuments(vscode_languageserver_textdocument_1.TextDocument);
 var TypeName;
@@ -26,14 +28,81 @@ connection.onInitialize((_params) => {
             // signatureHelpProvider: {
             //     "triggerCharacters": ["("]
             // },
-            // "definitionProvider" : "true",
-            // "hoverProvider" : "true",
-            // "documentFormattingProvider" : "true"
             semanticTokensProvider: {
                 full: true,
                 legend
             },
-            documentFormattingProvider: true
+            documentFormattingProvider: true,
+            hoverProvider: true,
+            definitionProvider: true
+        }
+    };
+});
+connection.onDefinition((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc)
+        return null;
+    const text = doc.getText();
+    const lines = text.split(/\r?\n/);
+    const line = lines[params.position.line];
+    if (!line)
+        return null;
+    // Detectar la palabra bajo el cursor
+    const regex = /\b[A-Za-z_]\w*\b/g;
+    let match;
+    let hoveredWord = null;
+    while ((match = regex.exec(line)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (params.position.character >= start && params.position.character <= end) {
+            hoveredWord = match[0];
+            break;
+        }
+    }
+    if (!hoveredWord)
+        return null;
+    // Buscar en el documento la línea de declaración
+    for (let i = 0; i < lines.length; i++) {
+        if (new RegExp(`\\b(?:in|out|const)?\\s*(int|float|bool|float2|float3|float4)\\s+${hoveredWord}\\b`).test(lines[i])) {
+            const charStart = lines[i].indexOf(hoveredWord);
+            return node_4.Location.create(params.textDocument.uri, node_2.Range.create(i, charStart, i, charStart + hoveredWord.length));
+        }
+    }
+    return null;
+});
+connection.onHover((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc)
+        return null;
+    const text = doc.getText();
+    const lines = text.split(/\r?\n/);
+    const line = lines[params.position.line];
+    if (!line)
+        return null;
+    // Buscar palabra bajo el cursor
+    const regex = /\b[A-Za-z_]\w*\b/g;
+    let match;
+    let hoveredWord = null;
+    while ((match = regex.exec(line)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (params.position.character >= start && params.position.character <= end) {
+            hoveredWord = match[0];
+            break;
+        }
+    }
+    if (!hoveredWord)
+        return null;
+    // Buscar info de variable
+    const vars = variableKinds[params.textDocument.uri] || [];
+    const v = vars.find(v => v.name === hoveredWord);
+    if (!v)
+        return null;
+    // Devolver información tipo tooltip
+    return {
+        contents: {
+            kind: node_3.MarkupKind.Markdown,
+            value: `**${v.name}**: \`${TypeName[v.type]}\``
         }
     };
 });

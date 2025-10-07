@@ -17,6 +17,8 @@ import {
 
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { TextEdit, Range } from "vscode-languageserver/node";
+import { Hover, MarkupKind } from "vscode-languageserver/node";
+import { Definition, Location } from "vscode-languageserver/node";
 import { Console } from "node:console";
 
 const connection = createConnection(ProposedFeatures.all);
@@ -44,14 +46,92 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
             // signatureHelpProvider: {
             //     "triggerCharacters": ["("]
             // },
-            // "definitionProvider" : "true",
-            // "hoverProvider" : "true",
-            // "documentFormattingProvider" : "true"
+
             semanticTokensProvider: {
                 full: true,
                 legend
             },
-            documentFormattingProvider: true
+            documentFormattingProvider: true,
+            hoverProvider: true,
+            definitionProvider: true
+        }
+    };
+});
+
+connection.onDefinition((params): Definition | null => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return null;
+
+    const text = doc.getText();
+    const lines = text.split(/\r?\n/);
+    const line = lines[params.position.line];
+    if (!line) return null;
+
+    // Detectar la palabra bajo el cursor
+    const regex = /\b[A-Za-z_]\w*\b/g;
+    let match: RegExpExecArray | null;
+    let hoveredWord: string | null = null;
+
+    while ((match = regex.exec(line)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (params.position.character >= start && params.position.character <= end) {
+            hoveredWord = match[0];
+            break;
+        }
+    }
+
+    if (!hoveredWord) return null;
+
+    // Buscar en el documento la línea de declaración
+    for (let i = 0; i < lines.length; i++) {
+        if (new RegExp(`\\b(?:in|out|const)?\\s*(int|float|bool|float2|float3|float4)\\s+${hoveredWord}\\b`).test(lines[i])) {
+            const charStart = lines[i].indexOf(hoveredWord);
+            return Location.create(
+                params.textDocument.uri,
+                Range.create(i, charStart, i, charStart + hoveredWord.length)
+            );
+        }
+    }
+
+    return null;
+});
+
+connection.onHover((params): Hover | null => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return null;
+
+    const text = doc.getText();
+    const lines = text.split(/\r?\n/);
+    const line = lines[params.position.line];
+    if (!line) return null;
+
+    // Buscar palabra bajo el cursor
+    const regex = /\b[A-Za-z_]\w*\b/g;
+    let match: RegExpExecArray | null;
+    let hoveredWord: string | null = null;
+
+    while ((match = regex.exec(line)) !== null) {
+        const start = match.index;
+        const end = start + match[0].length;
+        if (params.position.character >= start && params.position.character <= end) {
+            hoveredWord = match[0];
+            break;
+        }
+    }
+
+    if (!hoveredWord) return null;
+
+    // Buscar info de variable
+    const vars = variableKinds[params.textDocument.uri] || [];
+    const v = vars.find(v => v.name === hoveredWord);
+    if (!v) return null;
+
+    // Devolver información tipo tooltip
+    return {
+        contents: {
+            kind: MarkupKind.Markdown,
+            value: `**${v.name}**: \`${TypeName[v.type]}\``
         }
     };
 });
