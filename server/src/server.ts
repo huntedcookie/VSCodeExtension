@@ -16,6 +16,7 @@ import {
 } from "vscode-languageserver/node";
 
 import { TextDocument } from "vscode-languageserver-textdocument";
+import { TextEdit, Range } from "vscode-languageserver/node";
 import { Console } from "node:console";
 
 const connection = createConnection(ProposedFeatures.all);
@@ -49,9 +50,59 @@ connection.onInitialize((_params: InitializeParams): InitializeResult => {
             semanticTokensProvider: {
                 full: true,
                 legend
-            }
+            },
+            documentFormattingProvider: true
         }
     };
+});
+
+function formatMyLang(text: string): string {
+    const lines = text.split(/\r?\n/);
+    const formatted = lines
+        .map(line => {
+            // eliminar espacios extra
+            let trimmed = line.trim();
+
+            // agregar indentación según llaves
+            if (trimmed.startsWith("}")) {
+                trimmed = "    " + trimmed; // 4 espacios
+            } else if (trimmed.endsWith("{")) {
+                trimmed = "    " + trimmed;
+            }
+
+            return trimmed;
+        })
+        .join("\n");
+
+    return formatted + "\n";
+}
+
+
+connection.onDocumentFormatting(async (params, cancelToken) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    // Esperar configuración correctamente
+    const config = await connection.workspace.getConfiguration("mylang.enableAutoFormat");
+    if (!config) {
+        connection.console.log("Autoformat deshabilitado (config no encontrada)");
+        return [];
+    }
+
+    if (config === false) {
+        connection.console.log("Autoformat deshabilitado por settings");
+        return [];
+    }
+
+    const text = doc.getText();
+    const formatted = formatMyLang(text);
+
+    const edit: TextEdit = {
+        range: Range.create(0, 0, doc.lineCount, 0),
+        newText: formatted
+    };
+
+    return [edit];
 });
 
 function findVariables(text: string): VariableInfo[] {

@@ -12,6 +12,21 @@
   ],
   "main": "./out/client/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "MyLang",
+      "properties": {
+        "mylang.enableAutoFormat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Habilitar el autoformateo al guardar documentos de MyLang"
+        }
+      }
+    },
+    "configurationDefaults": {
+      "[mylang]": {
+        "editor.formatOnSave": true
+      }
+    },
     "languages": [
       {
         "id": "mylang",

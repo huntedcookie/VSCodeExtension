@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const node_1 = require("vscode-languageserver/node");
 const vscode_languageserver_textdocument_1 = require("vscode-languageserver-textdocument");
+const node_2 = require("vscode-languageserver/node");
 const connection = (0, node_1.createConnection)(node_1.ProposedFeatures.all);
 const documents = new node_1.TextDocuments(vscode_languageserver_textdocument_1.TextDocument);
 var TypeName;
@@ -31,9 +32,50 @@ connection.onInitialize((_params) => {
             semanticTokensProvider: {
                 full: true,
                 legend
-            }
+            },
+            documentFormattingProvider: true
         }
     };
+});
+function formatMyLang(text) {
+    const lines = text.split(/\r?\n/);
+    const formatted = lines
+        .map(line => {
+        // eliminar espacios extra
+        let trimmed = line.trim();
+        // agregar indentación según llaves
+        if (trimmed.startsWith("}")) {
+            trimmed = "    " + trimmed; // 4 espacios
+        }
+        else if (trimmed.endsWith("{")) {
+            trimmed = "    " + trimmed;
+        }
+        return trimmed;
+    })
+        .join("\n");
+    return formatted + "\n";
+}
+connection.onDocumentFormatting(async (params, cancelToken) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc)
+        return [];
+    // Esperar configuración correctamente
+    const config = await connection.workspace.getConfiguration("mylang.enableAutoFormat");
+    if (!config) {
+        connection.console.log("Autoformat deshabilitado (config no encontrada)");
+        return [];
+    }
+    if (config === false) {
+        connection.console.log("Autoformat deshabilitado por settings");
+        return [];
+    }
+    const text = doc.getText();
+    const formatted = formatMyLang(text);
+    const edit = {
+        range: node_2.Range.create(0, 0, doc.lineCount, 0),
+        newText: formatted
+    };
+    return [edit];
 });
 function findVariables(text) {
     const symbols = [];
